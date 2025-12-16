@@ -143,6 +143,7 @@ def stft(time_signal, time_dim=None, size=1024, shift=256,
         window = window(window_length)
         window = np.pad(window, (0, size - window_length), mode='constant')
 
+    # import pdb; pdb.set_trace()
     time_signal_seg = segment_axis(time_signal, size,
                                    size - shift, axis=time_dim)
 

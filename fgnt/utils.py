@@ -89,12 +89,12 @@ def segment_axis(a, length, overlap=0, axis=None, end='cut', endvalue=0):
     newstrides = a.strides[:axis] + ((length - overlap) * s, s) + a.strides[
                                                                   axis + 1:]
 
-    if not a.flags.contiguous:
-        a = a.copy()
-        newstrides = a.strides[:axis] + ((length - overlap) * s, s) + a.strides[
-                                                                      axis + 1:]
-        return np.ndarray.__new__(np.ndarray, strides=newstrides,
-                                  shape=newshape, buffer=a, dtype=a.dtype)
+    # if not a.flags.contiguous:
+    #     a = a.copy()
+    #     newstrides = a.strides[:axis] + ((length - overlap) * s, s) + a.strides[
+    #                                                                   axis + 1:]
+    #     return np.ndarray.__new__(np.ndarray, strides=newstrides,
+    #                               shape=newshape, buffer=a, dtype=a.dtype)
 
     try:
         return np.ndarray.__new__(np.ndarray, strides=newstrides,
@@ -152,3 +152,14 @@ class Timer(object):
         self.msecs = self.secs * 1000  # millisecs
         if self.verbose:
             print('elapsed time: %f ms' % self.msecs)
+
+def list_from_audio_dir(audio_dir):
+    """ Creates a list of audio file paths from a directory
+
+    :param audio_dir: path to directory containing audio files
+    :return: list of audio file paths
+    """
+    audio_list = []
+    
+    
+    return audio_list

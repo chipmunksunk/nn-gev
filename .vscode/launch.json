@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug my_beamform",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/my_beamform.py",
+            "console": "integratedTerminal",
+            "args": [
+                "/home/hahmad/Documents/MATLAB/LTSforWASN-main/databases/2025_12_02_15_33_55_nSetups20_15dB_400ms/wav_files",
+                "/home/hahmad/Documents/MATLAB/LTSforWASN-main/databases/2025_12_02_15_33_55_nSetups20_15dB_400ms/nn-gev-results",
+                "/home/hahmad/Documents/Coding Projects/nn-gev/data/BLSTM_model/best.nnet",
+                "BLSTM",
+                "--gpu",
+                "-1"
+            ]
+        }
+    ]
+}
