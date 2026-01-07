@@ -179,15 +179,29 @@ def phase_correction(vector):
             np.sum(w[f, :] * w[f-1, :].conj(), axis=-1, keepdims=True)))
     return w
 
+def get_atf_vector(noise_psd_matrix, beamforming_vector):
+    return np.einsum('...aa,...a->...a', noise_psd_matrix, beamforming_vector)
 
-def gev_wrapper_on_masks(mix, noise_mask=None, target_mask=None,
+def apply_atf_vector(atf_vector, signal):
+    return np.einsum('...a,...t->...at', atf_vector, signal)
+
+def gev_wrapper_on_masks(S, N, noise_mask=None, target_mask=None,
                          normalization=False):
     if noise_mask is None and target_mask is None:
         raise ValueError('At least one mask needs to be present.')
 
+    #Hashir: Changed function to accept multichannel S and N separately. mix is computed inside as sum of S and N.
+    S = S.astype(np.complex128)
+    S = S.T
+    N = N.astype(np.complex128)
+    N = N.T
+    
+    mix = S + N
+    
     org_dtype = mix.dtype
-    mix = mix.astype(np.complex128)
-    mix = mix.T
+    # mix = mix.astype(np.complex128)
+    # mix = mix.T
+
     if noise_mask is not None:
         noise_mask = noise_mask.T
     if target_mask is not None:
@@ -197,6 +211,7 @@ def gev_wrapper_on_masks(mix, noise_mask=None, target_mask=None,
         mix, target_mask, normalize=False)
     noise_psd_matrix = get_power_spectral_density_matrix(
         mix, noise_mask, normalize=True)
+    
     noise_psd_matrix = condition_covariance(noise_psd_matrix, 1e-6)
     noise_psd_matrix /= np.trace(
         noise_psd_matrix, axis1=-2, axis2=-1)[..., None, None]
@@ -206,7 +221,21 @@ def gev_wrapper_on_masks(mix, noise_mask=None, target_mask=None,
     if normalization:
         W_gev = blind_analytic_normalization(W_gev, noise_psd_matrix)
 
-    output = apply_beamforming_vector(W_gev, mix)
-    output = output.astype(org_dtype)
+    #Hashir: Changed output S_hat and N_hat by shadow filtering to return speech and noise separately. Beamforming vector still comes from the noisy mix.
+    # output = apply_beamforming_vector(W_gev, mix)
+    # output = output.astype(org_dtype)
+    S_hat_sc = apply_beamforming_vector(W_gev, S)
+    N_hat_sc = apply_beamforming_vector(W_gev, N)
 
-    return output.T
+    #Hashir: Added multichannel estimate. Might need to change the return variable.
+    H_gev = get_atf_vector(noise_psd_matrix, W_gev)
+
+    S_hat_mc = apply_atf_vector(H_gev.conj(), S_hat_sc)
+    N_hat_mc = apply_atf_vector(H_gev.conj(), N_hat_sc)
+
+    S_hat_mc = S_hat_mc.astype(org_dtype)
+    N_hat_mc = N_hat_mc.astype(org_dtype)
+
+    # import pdb; pdb.set_trace() 
+
+    return S_hat_sc.T, N_hat_sc.T

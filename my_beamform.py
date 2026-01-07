@@ -4,8 +4,8 @@ import librosa
 import glob
 import numpy as np
 
-from fgnt.utils import Timer
-from fgnt.signal_processing import audiowrite, stft, istft
+from fgnt.utils import Timer, mkdir_p
+from fgnt.signal_processing import audiowrite, stft, istft, istft_mc, compound_normalization
 from fgnt.beamforming import gev_wrapper_on_masks
 
 import chainer
@@ -27,6 +27,9 @@ parser.add_argument('model_type',
 parser.add_argument('--gpu', '-g', default=-1, type=int,
                     help='GPU ID (negative value indicates CPU)')
 args = parser.parse_args()
+
+# Create output directory if it does not exist
+mkdir_p(args.output_dir)
 
 # Prepare model
 if args.model_type == 'BLSTM':
@@ -52,9 +55,13 @@ nSetups = len(glob.glob(os.path.join(path_audio, 'setup_*_clean_speech.wav')))
 
 # Beamform loop
 for i in range(nSetups):
-    audio_data, _ = librosa.load(os.path.join(path_audio, "setup_"+str(i+1)+"_total.wav"), mono=False, sr=None)
+    S_data, _ = librosa.load(os.path.join(path_audio, "setup_"+str(i+1)+"_speech.wav"), mono=False, sr=None)
+    N_data, _ = librosa.load(os.path.join(path_audio, "setup_"+str(i+1)+"_noise.wav"), mono=False, sr=None)
 
-    Y = stft(audio_data, size=1024, shift=512, time_dim=1).transpose((1, 0, 2))
+    S = stft(S_data, size=1024, shift=512, time_dim=1).transpose((1, 0, 2)) #(nFrames, nChannels, nFreqs)
+    N = stft(N_data, size=1024, shift=512, time_dim=1).transpose((1, 0, 2))
+    Y = S + N
+
     Y_var = Variable(np.abs(Y).astype(np.float32))
     if args.gpu >= 0:
         Y_var.to_gpu(args.gpu)
@@ -65,19 +72,22 @@ for i in range(nSetups):
     t_net += t.msecs
 
     with Timer() as t:
-        N_mask = np.median(N_masks.data, axis=1)
+        N_mask = np.median(N_masks.data, axis=1) #(nFrames, nFreqs): Median over channels
         X_mask = np.median(X_masks.data, axis=1)
-        Y_hat = gev_wrapper_on_masks(Y, N_mask, X_mask)
+        S_hat, N_hat = gev_wrapper_on_masks(S, N, N_mask, X_mask)
+        Y_hat = S_hat + N_hat
     t_beamform += t.msecs
 
-    #adjust this to write to the provided output directory
-    filename = os.path.join(
-            args.output_dir,
-            'debug_output.wav'
-    )
-
     with Timer() as t:
-        audiowrite(istft(Y_hat, size=1024, shift=512), filename, 16000, True, True)
+        s_hat = istft_mc(S_hat, size=1024, shift=512) #(nSamples, nChannels)
+        n_hat = istft_mc(N_hat, size=1024, shift=512)
+        y_hat = istft_mc(Y_hat, size=1024, shift=512)
+
+        #Only normalize y_hat within audiowrite. S_hat and N_hat is normalized within compound_normalization and should retain scaling.
+        s_hat, n_hat = compound_normalization(s_hat, n_hat)
+        audiowrite(s_hat, os.path.join(args.output_dir, f'setup_{i+1}_d_hat.wav'), 16000, normalize=False, threaded=True)
+        audiowrite(n_hat, os.path.join(args.output_dir, f'setup_{i+1}_noise_hat.wav'), 16000, normalize=False, threaded=True)
+        audiowrite(y_hat, os.path.join(args.output_dir, f'setup_{i+1}_total_hat.wav'), 16000, normalize=True, threaded=True)
     t_io += t.msecs
 
 print('Finished')

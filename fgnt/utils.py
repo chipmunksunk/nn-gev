@@ -89,6 +89,7 @@ def segment_axis(a, length, overlap=0, axis=None, end='cut', endvalue=0):
     newstrides = a.strides[:axis] + ((length - overlap) * s, s) + a.strides[
                                                                   axis + 1:]
 
+    #Hashir: Following if-clause returned error in some cases, so commented out.
     # if not a.flags.contiguous:
     #     a = a.copy()
     #     newstrides = a.strides[:axis] + ((length - overlap) * s, s) + a.strides[
@@ -100,7 +101,7 @@ def segment_axis(a, length, overlap=0, axis=None, end='cut', endvalue=0):
         return np.ndarray.__new__(np.ndarray, strides=newstrides,
                                   shape=newshape, buffer=a, dtype=a.dtype)
     except TypeError or ValueError:
-        warnings.warn("Problem with ndarray creation forces copy.")
+        warnings.warn("Problem with ndarray creation forces copy.") # type: ignore
         a = a.copy()
         # Shape doesn't change but strides does
         newstrides = a.strides[:axis] + ((length - overlap) * s, s) + a.strides[

@@ -143,7 +143,6 @@ def stft(time_signal, time_dim=None, size=1024, shift=256,
         window = window(window_length)
         window = np.pad(window, (0, size - window_length), mode='constant')
 
-    # import pdb; pdb.set_trace()
     time_signal_seg = segment_axis(time_signal, size,
                                    size - shift, axis=time_dim)
 
@@ -198,6 +197,16 @@ def istft(stft_signal, size=1024, shift=256,
 
     return time_signal
 
+#Hashir: Added for multichannel ISTFT
+def istft_mc(stft_signal, size=1024, shift=256,
+             window=signal.blackman, fading=True, window_length=None):
+
+    if stft_signal.ndim == 2:
+        stft_signal = stft_signal[:, np.newaxis, :]
+    # Calculate the inverse STFT for each channel
+    return np.stack([istft(stft_signal[:, i, :], size, shift, window, fading, window_length)
+                     for i in range(stft_signal.shape[1])], axis=1)
+
 
 def audiowrite(data, path, samplerate=16000, normalize=False, threaded=True):
     """ Write the audio data ``data`` to the wav file ``path``
@@ -240,3 +249,12 @@ def audiowrite(data, path, samplerate=16000, normalize=False, threaded=True):
         wav_write(path, samplerate, data)
 
     return sample_to_clip
+
+#Hashir: Added compound normalization for consistent scaling of speech and noise
+def compound_normalization(*signals):
+    """
+    Normalize multiple signals to to be within a certain range, e.g. -1 to 1. But apply same normalization to all signals.
+    """
+    max_value = max([np.max(np.abs(s)) for s in signals])
+    normalized_signals = [s / max_value for s in signals]
+    return normalized_signals
